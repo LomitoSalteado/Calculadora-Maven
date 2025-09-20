@@ -1,0 +1,44 @@
+name: Deployment Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-test-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: '22'
+
+      - name: Build with Maven
+        run: mvn clean package
+
+      - name: Run all tests (unit, integration, acceptance)
+        run: mvn test
+
+      - name: Deploy to staging
+        run: |
+          mkdir -p deployment/staging
+          cp target/calculadora-maven-1.0-SNAPSHOT.jar deployment/staging/
+
+      - name: Simulate rollback if tests fail
+        if: failure()
+        run: |
+          echo "Tests failed! Rolling back..."
+          rm -rf deployment/staging/*
+          cp deployment/production/calculadora-maven-1.0-SNAPSHOT.jar deployment/staging/
+
+      - name: Promote to production
+        if: success()
+        run: |
+          mkdir -p deployment/production
+          cp deployment/staging/calculadora-maven-1.0-SNAPSHOT.jar deployment/production/
